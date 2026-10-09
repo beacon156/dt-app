@@ -1,0 +1,438 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+<title>简单题库</title>
+<style>
+/* ============ 基础 ============ */
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; padding: 0; }
+body {
+  background: #F7F7F7; color: #191919;
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+  -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent;
+}
+button { font-family: inherit; border: none; cursor: pointer; background: none; }
+input, textarea, select { font-family: inherit; }
+
+/* ============ 应用容器（全屏） ============ */
+.app { height: 100%; position: relative; overflow: hidden; }
+
+/* ============ 导航栏（适配刘海屏） ============ */
+.navbar {
+  min-height: 44px; padding-top: env(safe-area-inset-top);
+  display: flex; align-items: center; justify-content: center;
+  position: relative; font-weight: 600; color: #191919; font-size: 16px;
+  background: #fff; border-bottom: 1px solid #EDEDED; flex: 0 0 auto;
+}
+.navbar .back, .navbar .right {
+  position: absolute; top: env(safe-area-inset-top); bottom: 0;
+  display: flex; align-items: center; color: #191919;
+}
+.navbar .back { left: 12px; font-size: 15px; padding: 0 6px; font-weight: 400; }
+.navbar .right { right: 12px; gap: 12px; }
+.navbar .right button { font-size: 14px; padding: 6px 2px; }
+#btn-redo { color: #07C160; }
+#btn-clear-wrong { color: #FA5151; }
+
+/* ============ 页面 / 滚动 ============ */
+.page { display: none; height: 100%; flex-direction: column; }
+.page.active { display: flex; }
+.scroll { flex: 1; overflow-y: auto; background: #F7F7F7; -webkit-overflow-scrolling: touch; }
+.scroll::-webkit-scrollbar { width: 0; }
+
+/* ============ 底部 tabbar（适配手势条） ============ */
+.tabbar { border-top: 1px solid #EDEDED; background: #fff; display: flex; padding-bottom: env(safe-area-inset-bottom); flex: 0 0 auto; }
+.tabbar .tab { flex: 1; height: 54px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; color: #888; font-size: 11px; }
+.tabbar .tab.active { color: #07C160; }
+.tabbar .tab svg { width: 22px; height: 22px; }
+
+/* ============ 通用组件 ============ */
+.cell { background:#fff; padding: 14px 16px; display:flex; align-items:center; justify-content:space-between; border-bottom: 1px solid #EDEDED; }
+.cell:last-child { border-bottom: none; }
+.group { background: #fff; border-radius: 8px; margin: 12px; overflow: hidden; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+.btn { display:flex; align-items:center; justify-content:center; padding: 10px 16px; border-radius: 6px; font-weight: 500; font-size: 14px; }
+.btn-primary { background:#07C160; color:#fff; }
+.btn-ghost { background:#fff; color:#191919; border:1px solid #EDEDED; }
+.option { display:flex; align-items:center; gap:10px; padding: 12px 14px; border:1px solid #EDEDED; border-radius: 8px; background:#fff; cursor:pointer; transition: all .15s; }
+.option .key { width: 26px; height:26px; border-radius:50%; background:#F0F0F0; color:#555; font-weight:600; display:flex; align-items:center; justify-content:center; font-size: 13px; flex: 0 0 auto; }
+.option.selected { border-color:#07C160; background: rgba(7,193,96,.06); }
+.option.selected .key { background:#07C160; color:#fff; }
+.option.correct { border-color:#07C160; background: rgba(7,193,96,.08); }
+.option.correct .key { background:#07C160; color:#fff; }
+.option.wrong { border-color:#FA5151; background: rgba(250,81,81,.08); }
+.option.wrong .key { background:#FA5151; color:#fff; }
+.option.locked { pointer-events: none; }
+.badge { display:inline-flex; align-items:center; padding: 1px 6px; border-radius: 4px; font-size: 11px; font-weight: 500; }
+.badge-wrong { background: rgba(250,81,81,.1); color:#FA5151; }
+.badge-right { background: rgba(7,193,96,.1); color:#07C160; }
+textarea, input[type="text"], select {
+  width:100%; padding:10px 12px; border:1px solid #EDEDED; border-radius:6px;
+  background:#fff; font-size: 14px; outline: none; box-sizing: border-box;
+}
+textarea:focus, input:focus, select:focus { border-color:#07C160; }
+.toast {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%);
+  background: rgba(0,0,0,.78); color:#fff; padding: 10px 18px; border-radius: 8px;
+  font-size: 14px; z-index: 200; pointer-events:none; opacity: 0; transition: opacity .2s; white-space: nowrap;
+}
+.toast.show { opacity: 1; }
+.modal-mask { position:absolute; inset:0; background: rgba(0,0,0,.45); z-index: 100; display:none; align-items:flex-end; }
+.modal-mask.show { display:flex; }
+.modal { background:#fff; width:100%; border-top-left-radius: 14px; border-top-right-radius: 14px; padding: 16px; max-height: 80%; overflow-y: auto; }
+.empty { display:flex; flex-direction:column; align-items:center; justify-content:center; color:#999; padding: 60px 20px; gap: 8px; font-size: 14px; }
+.progress { height: 4px; background:#EDEDED; border-radius: 2px; overflow:hidden; }
+.progress > div { height:100%; background:#07C160; transition: width .3s; }
+
+/* ============ 工具类（离线替代 Tailwind CDN） ============ */
+.flex { display:flex; } .flex-col { display:flex; flex-direction:column; }
+.flex-1 { flex:1; } .grid { display:grid; }
+.grid-cols-2 { grid-template-columns: repeat(2,1fr); }
+.grid-cols-3 { grid-template-columns: repeat(3,1fr); }
+.grid-cols-4 { grid-template-columns: repeat(4,1fr); }
+.gap-2 { gap:8px; } .gap-3 { gap:12px; }
+.items-center { align-items:center; } .items-start { align-items:flex-start; }
+.justify-center { justify-content:center; } .justify-between { justify-content:space-between; } .justify-end { justify-content:flex-end; }
+.text-center { text-align:center; }
+.space-y-2 > * + * { margin-top: 8px; }
+.space-y-0-5 > * + * { margin-top: 2px; }
+.m-3 { margin:12px; }
+.mt-1 { margin-top:4px; } .mt-2 { margin-top:8px; } .mt-3 { margin-top:12px; } .mt-4 { margin-top:16px; } .mt-6 { margin-top:24px; }
+.mb-2 { margin-bottom:8px; } .mb-3 { margin-bottom:12px; } .mb-4 { margin-bottom:16px; }
+.mx-3 { margin-left:12px; margin-right:12px; } .mx-0 { margin-left:0; margin-right:0; }
+.my-3 { margin-top:12px; margin-bottom:12px; } .my-2 { margin-top:8px; margin-bottom:8px; }
+.p-1 { padding:4px; } .p-3 { padding:12px; } .p-4 { padding:16px; } .p-6 { padding:24px; }
+.px-1 { padding-left:4px; padding-right:4px; } .px-3 { padding-left:12px; padding-right:12px; } .px-4 { padding-left:16px; padding-right:16px; }
+.py-2 { padding-top:8px; padding-bottom:8px; } .py-4 { padding-top:16px; padding-bottom:16px; }
+.pt-3 { padding-top:12px; } .pb-1 { padding-bottom:4px; }
+.text-xs { font-size:12px; } .text-sm { font-size:14px; } .text-base { font-size:16px; }
+.text-lg { font-size:18px; } .text-2xl { font-size:24px; }
+.text-3xl { font-size:30px; } .text-4xl { font-size:36px; } .text-6xl { font-size:60px; }
+.text-11 { font-size:11px; } .text-15 { font-size:15px; }
+.font-medium { font-weight:500; } .font-semibold { font-weight:600; }
+.leading-relaxed { line-height:1.6; }
+.italic { font-style:italic; }
+.whitespace-pre-wrap { white-space:pre-wrap; }
+.w-full { width:100%; } .h-full { height:100%; }
+.w-6 { width:24px; } .w-9 { width:36px; } .h-9 { height:36px; }
+.w-1-5 { width:6px; } .h-4 { height:16px; }
+.shrink-0 { flex-shrink:0; }
+.rounded { border-radius:4px; } .rounded-md { border-radius:8px; } .rounded-lg { border-radius:12px; } .rounded-full { border-radius:9999px; }
+.bg-white { background:#fff; }
+.bg-wechat-bg { background:#F7F7F7; }
+.bg-wechat-green { background:#07C160; }
+.bg-white-15 { background: rgba(255,255,255,.15); }
+.text-white { color:#fff; }
+.text-wechat-text { color:#191919; } .text-wechat-sub { color:#888888; } .text-wechat-danger { color:#FA5151; }
+.text-wechat-green { color:#07C160; }
+.text-blue { color:#1677FF; }
+.shadow-card { box-shadow: 0 1px 2px rgba(0,0,0,.04); }
+.opacity-90 { opacity:.9; }
+.hidden { display:none; }
+.sticky-top { position:sticky; top:0; z-index:10; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ========== 首页 ========== -->
+  <section id="page-home" class="page active">
+    <div class="navbar"><span>简单题库</span></div>
+    <div class="scroll">
+      <div class="m-3 p-4 rounded-lg text-white" style="background: linear-gradient(135deg,#07C160,#00B86C);">
+        <div class="text-sm opacity-90">我的题库</div>
+        <div class="text-3xl font-semibold mt-1" id="stat-total">0</div>
+        <div class="text-xs opacity-90 mt-1">已收录题目</div>
+        <div class="grid grid-cols-3 gap-2 mt-4 text-center">
+          <div class="bg-white-15 rounded-md py-2">
+            <div class="text-base font-semibold" id="stat-answered">0</div>
+            <div class="text-11 opacity-90">已作答</div>
+          </div>
+          <div class="bg-white-15 rounded-md py-2">
+            <div class="text-base font-semibold" id="stat-right">0</div>
+            <div class="text-11 opacity-90">正确</div>
+          </div>
+          <div class="bg-white-15 rounded-md py-2">
+            <div class="text-base font-semibold" id="stat-wrong">0</div>
+            <div class="text-11 opacity-90">错题</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="group my-2">
+        <div class="cell" data-go="quiz">
+          <div class="flex items-center gap-3">
+            <div class="w-9 h-9 rounded-md flex justify-center items-center" style="background:rgba(7,193,96,.12);color:#07C160;">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M12 2a10 10 0 100 20 10 10 0 000-20zm-1 15l-5-5 1.4-1.4L11 14.2l6.6-6.6L19 9l-8 8z"/></svg>
+            </div>
+            <div>
+              <div class="text-15 font-medium text-wechat-text">开始答题</div>
+              <div class="text-xs text-wechat-sub">章节或随机刷题</div>
+            </div>
+          </div>
+          <span class="text-wechat-sub">›</span>
+        </div>
+        <div class="cell" data-go="wrong">
+          <div class="flex items-center gap-3">
+            <div class="w-9 h-9 rounded-md flex justify-center items-center" style="background:rgba(250,81,81,.12);color:#FA5151;">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M12 2L1 21h22L12 2zm0 6l7.5 13h-15L12 8zm-1 4h2v4h-2v-4zm0 5h2v2h-2v-2z"/></svg>
+            </div>
+            <div>
+              <div class="text-15 font-medium text-wechat-text">错题集</div>
+              <div class="text-xs text-wechat-sub">回顾错题，重做巩固</div>
+            </div>
+          </div>
+          <span class="text-wechat-sub">›</span>
+        </div>
+        <div class="cell" data-go="input">
+          <div class="flex items-center gap-3">
+            <div class="w-9 h-9 rounded-md flex justify-center items-center" style="background:rgba(22,119,255,.12);color:#1677FF;">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 000-1.41l-2.34-2.34a1 1 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+            </div>
+            <div>
+              <div class="text-15 font-medium text-wechat-text">录入题目</div>
+              <div class="text-xs text-wechat-sub">手动录入 / 批量导入</div>
+            </div>
+          </div>
+          <span class="text-wechat-sub">›</span>
+        </div>
+      </div>
+
+      <div class="group">
+        <div class="px-4 pt-3 pb-1 text-xs text-wechat-sub">数据备份</div>
+        <div class="cell" id="btn-export"><span>导出题库 JSON</span><span class="text-wechat-sub">↗</span></div>
+        <div class="cell" id="btn-import"><span>导入题库 JSON</span><span class="text-wechat-sub">↙</span></div>
+        <div class="cell" id="btn-sample"><span>载入示例题库</span><span class="text-wechat-sub">+</span></div>
+        <div class="cell" id="btn-reset"><span class="text-wechat-danger">清空全部数据</span><span class="text-wechat-sub">›</span></div>
+      </div>
+
+      <div class="text-center text-11 text-wechat-sub py-4">数据保存在手机本地</div>
+    </div>
+    <div class="tabbar">
+      <div class="tab active" data-go="home">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3l9 8h-3v9h-4v-6H10v6H6v-9H3z"/></svg>
+        <span>首页</span>
+      </div>
+      <div class="tab" data-go="input">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z"/></svg>
+        <span>录入</span>
+      </div>
+      <div class="tab" data-go="quiz">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 100 20 10 10 0 000-20zm-1 15l-5-5 1.4-1.4L11 14.2l6.6-6.6L19 9l-8 8z"/></svg>
+        <span>答题</span>
+      </div>
+      <div class="tab" data-go="wrong">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L1 21h22L12 2zm0 6l7.5 13h-15L12 8zm-1 4h2v4h-2v-4zm0 5h2v2h-2v-2z"/></svg>
+        <span>错题</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== 录入页 ========== -->
+  <section id="page-input" class="page">
+    <div class="navbar">
+      <div class="back" data-back>‹ 返回</div>
+      <span>录入题目</span>
+    </div>
+    <div class="scroll">
+      <div class="flex m-3 bg-white rounded-md p-1 text-sm">
+        <div class="flex-1 text-center py-2 rounded bg-wechat-green text-white" data-tab="manual">手动录入</div>
+        <div class="flex-1 text-center py-2 rounded text-wechat-sub" data-tab="batch">批量导入</div>
+        <div class="flex-1 text-center py-2 rounded text-wechat-sub" data-tab="list">题目列表</div>
+      </div>
+
+      <div id="tab-manual" class="px-3">
+        <div class="group" style="margin:0;">
+          <div class="px-3 py-2 text-xs text-wechat-sub bg-wechat-bg">章节（可选）</div>
+          <div class="p-3"><input type="text" id="f-chapter" placeholder="如：第一章 基础概念，留空归入“未分类”"></div>
+        </div>
+        <div class="group">
+          <div class="px-3 py-2 text-xs text-wechat-sub bg-wechat-bg">题干</div>
+          <div class="p-3"><textarea id="f-q" rows="3" placeholder="请输入题干..."></textarea></div>
+        </div>
+        <div class="group">
+          <div class="px-3 py-2 text-xs text-wechat-sub bg-wechat-bg">选项</div>
+          <div class="p-3 space-y-2">
+            <div class="flex items-center gap-2"><span class="w-6 text-center font-semibold">A</span><input type="text" id="f-a" placeholder="选项 A"></div>
+            <div class="flex items-center gap-2"><span class="w-6 text-center font-semibold">B</span><input type="text" id="f-b" placeholder="选项 B"></div>
+            <div class="flex items-center gap-2"><span class="w-6 text-center font-semibold">C</span><input type="text" id="f-c" placeholder="选项 C"></div>
+            <div class="flex items-center gap-2"><span class="w-6 text-center font-semibold">D</span><input type="text" id="f-d" placeholder="选项 D"></div>
+          </div>
+        </div>
+        <div class="group">
+          <div class="px-3 py-2 text-xs text-wechat-sub bg-wechat-bg">正确答案</div>
+          <div class="p-3 grid grid-cols-4 gap-2" id="f-answer">
+            <button type="button" data-val="A" class="btn btn-ghost">A</button>
+            <button type="button" data-val="B" class="btn btn-ghost">B</button>
+            <button type="button" data-val="C" class="btn btn-ghost">C</button>
+            <button type="button" data-val="D" class="btn btn-ghost">D</button>
+          </div>
+        </div>
+        <div class="group">
+          <div class="px-3 py-2 text-xs text-wechat-sub bg-wechat-bg">解析（可选）</div>
+          <div class="p-3"><textarea id="f-exp" rows="2" placeholder="可填写解题思路..."></textarea></div>
+        </div>
+        <div class="flex gap-2 mx-3 my-3">
+          <button class="btn btn-primary flex-1" id="btn-save">保存题目</button>
+          <button class="btn btn-ghost" id="btn-clear">清空</button>
+        </div>
+      </div>
+
+      <div id="tab-batch" class="hidden px-3">
+        <div class="group" style="margin:0;">
+          <div class="px-3 py-2 text-xs text-wechat-sub bg-wechat-bg">粘贴 JSON</div>
+          <div class="p-3">
+            <textarea id="batch-text" rows="10" placeholder='[{"chapter":"第一章","q":"题干","options":["A选项","B选项","C选项","D选项"],"answer":"A","explain":"解析"}]'></textarea>
+            <div class="text-xs text-wechat-sub mt-2">支持 JSON 数组或 {questions:[...]} 结构，每项字段：chapter(可) / q / options(数组) / answer(A-D) / explain(可)</div>
+          </div>
+        </div>
+        <div class="flex gap-2 mx-0 my-3">
+          <button class="btn btn-primary flex-1" id="btn-batch-import">解析并导入</button>
+          <button class="btn btn-ghost" id="btn-batch-template">填入模板</button>
+        </div>
+      </div>
+
+      <div id="tab-list" class="hidden px-3">
+        <div class="flex items-center justify-between px-1 py-2 text-xs text-wechat-sub">
+          <span>共 <b id="list-count" class="text-wechat-text">0</b> 题</span>
+          <span>按章节分组 · 可删除单题或整章</span>
+        </div>
+        <div id="q-list" class="space-y-2"></div>
+        <div id="q-empty" class="empty hidden">
+          <div class="text-4xl">📋</div>
+          <div>暂无题目</div>
+          <div class="text-xs">先录入或导入一些题目吧</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== 答题页 ========== -->
+  <section id="page-quiz" class="page">
+    <div class="navbar">
+      <div class="back" data-back>‹ 返回</div>
+      <span id="quiz-title">答题</span>
+    </div>
+    <div class="scroll" id="quiz-scroll">
+      <div id="quiz-setup" class="p-3">
+        <div class="group" style="margin:0;">
+          <div class="px-3 py-2 text-xs text-wechat-sub bg-wechat-bg">答题模式</div>
+          <div class="p-3 grid grid-cols-2 gap-2">
+            <button class="btn btn-primary" data-mode="chapter">章节答题</button>
+            <button class="btn btn-ghost" data-mode="random">随机答题</button>
+          </div>
+        </div>
+        <div class="group" id="chapter-group">
+          <div class="px-3 py-2 text-xs text-wechat-sub bg-wechat-bg">选择章节</div>
+          <div class="p-3">
+            <select id="quiz-chapter" class="w-full"></select>
+          </div>
+        </div>
+        <div class="group">
+          <div class="px-3 py-2 text-xs text-wechat-sub bg-wechat-bg">题数</div>
+          <div class="p-3">
+            <div class="flex items-center justify-between">
+              <span class="text-sm text-wechat-text">本次答题数量</span>
+              <select id="quiz-count">
+                <option value="10">10</option>
+                <option value="20" selected>20</option>
+                <option value="50">50</option>
+                <option value="all">全部</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="group">
+          <div class="cell"><span>题库总数</span><span class="text-wechat-sub" id="quiz-pool">0</span></div>
+        </div>
+        <div class="mx-0 my-3">
+          <button class="btn btn-primary w-full" id="btn-start">开始答题</button>
+        </div>
+        <div id="quiz-empty" class="empty hidden">
+          <div>题库为空，请先录入题目</div>
+        </div>
+      </div>
+
+      <div id="quiz-run" class="hidden">
+        <div class="px-4 pt-3">
+          <div class="flex items-center justify-between text-xs text-wechat-sub mb-2">
+            <span id="quiz-progress-text">1 / 10</span>
+            <span id="quiz-correct-text">正确 0</span>
+          </div>
+          <div class="progress mb-3"><div id="quiz-bar" style="width:10%"></div></div>
+          <div class="bg-white rounded-lg p-4 shadow-card text-15 leading-relaxed text-wechat-text whitespace-pre-wrap" id="q-text"></div>
+          <div class="mt-3 space-y-2" id="q-options"></div>
+          <div id="q-result" class="mt-3 rounded-lg p-3 text-sm hidden"></div>
+          <div class="flex gap-2 mt-4 mb-4">
+            <button id="btn-prev" class="btn btn-ghost flex-1">上一题</button>
+            <button id="btn-next" class="btn btn-primary flex-1 hidden">下一题</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="quiz-done" class="hidden p-6 text-center">
+        <div class="text-6xl mb-3">🎉</div>
+        <div class="text-lg font-semibold text-wechat-text">本次答题结束</div>
+        <div class="mt-3 text-sm text-wechat-sub">
+          共 <b id="done-total" class="text-wechat-text">0</b> 题
+          &nbsp;正确 <b id="done-right" class="text-wechat-green">0</b>
+          &nbsp;错误 <b id="done-wrong" class="text-wechat-danger">0</b>
+        </div>
+        <div class="mt-6 space-y-2">
+          <button class="btn btn-primary w-full" id="btn-restart">再来一次</button>
+          <button class="btn btn-ghost w-full" data-go="wrong">查看错题</button>
+          <button class="btn btn-ghost w-full" data-go="home">回到首页</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== 错题集 ========== -->
+  <section id="page-wrong" class="page">
+    <div class="navbar">
+      <div class="back" data-back>‹ 返回</div>
+      <span>错题集</span>
+      <div class="right">
+        <button id="btn-redo">重做</button>
+        <button id="btn-clear-wrong">清空</button>
+      </div>
+    </div>
+    <div class="scroll">
+      <div class="px-3 pt-3 text-xs text-wechat-sub flex justify-between">
+        <span>共 <b id="wrong-count" class="text-wechat-text">0</b> 题</span>
+        <span>答对后将自动移除</span>
+      </div>
+      <div id="wrong-list" class="m-3 space-y-2"></div>
+      <div id="wrong-empty" class="empty">
+        <div class="text-4xl">🎯</div>
+        <div>暂无错题</div>
+        <div class="text-xs text-wechat-sub">继续努力！</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Toast -->
+  <div id="toast" class="toast"></div>
+
+  <!-- 编辑弹窗 -->
+  <div id="modal" class="modal-mask">
+    <div class="modal">
+      <div class="text-base font-semibold mb-2" id="m-title">编辑题目</div>
+      <div id="m-body" class="space-y-2"></div>
+      <div class="flex gap-2 mt-4">
+        <button class="btn btn-ghost flex-1" id="m-cancel">取消</button>
+        <button class="btn btn-primary flex-1" id="m-ok">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <input type="file" id="file-input" accept="application/json" class="hidden" />
+</div>
+
+<script src="app-core.js"></script>
+<script src="app-input.js"></script>
+<script src="app-quiz.js"></script>
+<script src="app-wrong.js"></script>
+</body>
+</html>
